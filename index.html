@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YAML</title>
+    <style>
+      pre {
+        padding: 1em;
+        margin: 1em;
+        border: 1px solid #ccc;
+        font-family: IBM Plex Mono;
+        font-size: 12px;
+      }
+      .exports b {
+        padding: 0 1em 0;
+      }
+    </style>
+    <script type="module">
+      import * as U from '/src/util.js'
+      import Log from '/src/log.js'
+      import Yaml from '/src/yaml/blocks.js'
+      import format from '/src/yaml/format.js'
+      import $ from '/src/u.dom.js'
+
+      const { is, A, S, O } = U
+      const doc = document
+
+      O.assign(window, {
+        A, S, O, doc,
+        $, Log, log: Log, Yaml, format,
+      })
+
+      // document.addEventListener('DOMContentLoaded', () => {})
+
+      // doc.on('visibilitychange', e => {
+      //   Log('%cVisibility State Change: %s', 'font-size: 2em; color: #30a14e;', doc.visibilityState)
+      // })
+
+      onload = () => {
+        Log('%cUtil.exports', 'color: #30a14e;')
+        Log.each(O.keys(U))
+
+        O.assign(window, U)
+
+        let { frag } = $
+        O.each(U, (v, k) => frag.append($.li($.b(is.T(v).low), k)))
+
+        setTimeout(() => {
+          $('aside', 1).append($.section($.h3('Util'), $.ol({ className: 'exports' }, frag)))
+
+          const jsn = $('#json', 1)
+          const yml = $('#yaml', 1)
+
+          $('#json2yaml', 1).on('click', e => {
+            yml.text = Yaml.stringify(JSON.parse(jsn.text))
+          })
+
+          $('#yaml2json', 1).on('click', e => {
+            jsn.text = JSON.stringify(Yaml(yml.text), 0, 2)
+              .replace(/\n +\]/g, ' ]')
+                .replace(/\[\n +/g, '[ ')
+          })
+        }, 100)
+      }
+
+
+    </script>
+  </head>
+  <body>
+
+    <aside></aside>
+    <main>
+      <pre id=json contenteditable spellcheck=false></pre>
+      <pre id=yaml contenteditable spellcheck=false></pre>
+
+      <button id=json2yaml>json to yaml</button>
+      <button id=yaml2json>yaml to json</button>
+    </main>
+
+  </body>
+</html>

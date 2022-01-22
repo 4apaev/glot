@@ -1,0 +1,27 @@
+{
+
+  "lines": 90,
+  "branches": 90,
+  "functions": 90,
+  "statements": 90,
+
+  "reporter": [
+    "lcov"
+  ],
+
+  "include": [
+    "src/**"
+  ],
+
+  "exclude": [
+    "highlight/**",
+    "test/**",
+    "index.js",
+  ],
+
+  "clean": true,
+  "perFile": true,
+  "checkCoverage": true,
+  "report-dir": ".c8cover",
+  "temp-directory": ".c8temp"
+}
