@@ -1,237 +1,271 @@
-import is, { T, Fail, assert, raise, deny } from './is.js'
-
-export const µ = null
-export const A = Array
-export const S = String
+export const µ = undefined
 export const O = Object
-export { is, T, Fail, assert, raise, deny }
+export const A = Array
+export const F = Function
+export const B = Boolean
+export const N = Number
+export const S = String
+export const E = Error
+export const P = Promise
 
-export function def() {
-  let [[ c, e, w ], [ a, b ]] = T.args.binary(arguments)
-  for (let k in b = O.getOwnPropertyDescriptors(b)) {
-    (b[ k ].get ?? (
-      w != µ && (b[ k ].writable = w)))
-    e != µ && (b[ k ].enumerable = e)
-    c != µ && (b[ k ].configurable = c)
+export const {
+  keys,
+  assign,
+  fromEntries,
+} = O
+
+///////////////////////////////////////////////////////////
+
+export function T(x) {
+  return toString.call(x).slice(8, -1)
+}
+
+export function Is(a, b) {
+  return arguments.length < 2
+    ? a != µ
+    : a === b?.constructor
+}
+
+Is.a = A.isArray
+Is.n = N.isFinite
+Is.n.i = N.isInteger
+Is.f = x => typeof x == 'function'
+Is.b = x => typeof x == 'boolean'
+Is.s = x => typeof x == 'string'
+Is.S = x => typeof x == 'symbol'
+Is.o = x => typeof x == 'object' && !!x
+Is.i = x => Symbol.iterator in O(x)
+///////////////////////////////////////////////////////////
+
+export class Fail extends Error {
+  opts = O.o
+  name = 'Fail'
+
+  constructor(m, o) {
+    if (Is.n(o))
+      o = { code: o }
+
+    else if (Is.s(o) || Is(E, o))
+      o = { cause: o }
+
+    super(m, o)
+    E.captureStackTrace(this, Fail)
+    Is(O, o) && assign(this.opts, o)
   }
 
-  return O.defineProperties(a, b)
+  get code() {
+    return this.opts.code ??= 0
+  }
+
+  static is = x => Is(this, x)
+  static as = (m, c) => Reflect.construct(this, [ m, c ])
+  static raise = (m, c) => {
+    throw Reflect.construct(this, [ m, c ])
+  }
+}
+
+export function raise(m, o) {
+  throw (raise.e = Is.f(o)
+    ? new o(m)
+    : new Fail(m, o))
+}
+
+///////////////////////////////////////////////////////////
+
+export function echo(x) {
+  return x
+}
+
+export function sleep(...a) {
+  return new P(ok =>
+    setTimeout(ok, ...a))
+}
+
+export function apply(fn, argv, ctx) {
+  return Reflect.apply(
+    fn,
+    ctx,
+    argv,
+  )
+}
+
+export function random(a, b, r = Math.random()) {
+  return a == µ
+    ? r
+    : Math.round(b == µ
+      ? r * a
+      : r * (b - a) + a)
+}
+
+use(echo, {
+  argv() {
+    return arguments
+  },
+})
+
+use(random, {
+  valueOf: Math.random,
+
+  get bool() {
+    return random > .5
+  },
+
+  get bin() {
+    return N(random.bool)
+  },
+
+  get uid() {
+    return globalThis.crypto.randomUUID()
+  },
+
+  rnd(a, b, c = new Set) {
+
+    crypto.randomInt
+
+  },
+
+  string(size, prev = '') {
+    prev += A.from('abcdefghijklmnopqrstuvwxyz').sort(() => random.bool ? 1 : -1).join('')
+    return prev.length < size
+      ? random.string(size, prev)
+      : prev.slice(0, size)
+  },
+})
+
+///////////////////////////////////////////////////////////
+
+export function mix(...a) {
+  return assign(O.o, ...a)
 }
 
 export function use(a, b) {
-  return def(a, b, 1, 0, 1)
+  return O.defineProperties(a,
+    O.getOwnPropertyDescriptors(b))
 }
 
-use(O, {
-  get o() { return O.create(µ) },
-  def,   use,
-  set,   mix,
-  each,  from,
-  alias, aliasGet,
-})
-
-def.each = useEach
-use.each = useEach
-
-export function useEach(...a) {
-  return (fn, ...b) => {
-    a.forEach(is.f(fn)
-      ? x => fn(x, ...b)
-      : x => def(x, fn, ...b))
-  }
+export function alias(a, b, c = b, d = a) {
+  return O.defineProperty(d, c,
+    O.getOwnPropertyDescriptor(a, b))
 }
 
-export function mix(...a) {
-  return O.assign(O.o, ...a)
-}
-
-export function get(a, b) {
-  return b
-    ? O.getOwnPropertyDescriptor(a, b)
-    : O.getOwnPropertyDescriptors(a)
-}
-
-export function set(o, n, v, c, e) {
-  let d = {
-    get() { return v },
-    configurable: !!c,
-    enumerable: !!e,
-  }
-  c && (d.set = x => v = x)
-  return O.defineProperty(o, n, d)
-}
-
-export function from(x)  {
-  return is.I(x)
-    ? O.fromEntries(x?.entries?.() ?? A.from(x, (v, i) => [ i, v ]))
+export function entries(x) {
+  return Is.i(x)
+    ? x?.entries?.() ?? A.from(x, (v, k) => [ k, v ])
     : O.entries(x)
 }
 
-export function alias() {
-  let [[ c, ...d ], [ a, b = a ]] = T.args.binary(arguments)
-  let ds = get(a, c)
-  for (let x of d)
-    O.defineProperty(b, x, ds)
-  return b
+export function each(it, fx, ctx) {
+  for (const [ k, v ] of entries(it))
+    fx.call(ctx, k, v)
+  return ctx
 }
 
-export function aliasGet(a, b, c, ...d) {
-  return use(a, {
-    get [ c ]() {
-      return this[ b ](...d)
-    },
-    set [ c ](x) {
-      this[ b ].apply(this, [].concat(x))
-    },
-  })
+///////////////////////////////////////////////////////////
+
+export function predicate(fx) {
+  return Is.f(fx)
+    ? fx
+    : (fx = (e => o => e.every(([ k, v ]) => v === o[ k ]))(entries(fx)))
 }
 
-export function each(it, cb, prev) {
-  const stop = Symbol('📛')
-  for (let [ k, v ] of it?.entries?.() ?? O.entries(it)) {
-    prev = cb(v, k, prev, stop)
-    if (prev === stop) break
-  }
-  return prev
+export function fill(n, fx = echo) {
+  return Is.f(fx)
+    ? A.from({ length: n }, (_, i) => fx(i))
+    : new A(n).fill(fx)
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-export function az(a, b) {
-  a === +a || (a = a.codePointAt())
-  b != µ
-    ? (b === +b || (b = b.codePointAt()))
-    : (a + 32)
-  b > a || ([ a, b ] = [ b, a ])
-  return A.range(a, b, S.point)
-}
-
-tmpl.raw = (s, ...a) => tmpl(s, a).join('')
-export function tmpl(s, a, cb = x => x) {
-  for (var i = 0, re = [ s.raw[ i ] ]; i < a.length;)
-    re = re.concat(cb(a[ i++ ]), s.raw[ i ])
+export function rm(it, iter, ctx, j = 0, re = []) {
+  for (let x, i = 0, cb = predicate(iter); i < it.length; i++)
+    cb.call(ctx, x = it[ i ], i) ? re.push(x) : it[ j++ ] = it[ i ]
+  it.length = j
   return re
 }
 
-
-export function fill(i, cb = x => x) {
-  return A.from({ length: i }, (_, i) => cb(i))
-}
-
-export function range(start, end, step = 1) {
-  return A.fill(1 + end - start, is.f(step)
-    ? i => step(start + i)
-    : _ => start += step)
-}
-
-export function invoke(it, fn, ...a) {
-  return it.map(is.f(fn)
-    ? x => fn.apply(x, a)
-    : x => x[ fn ].apply(x, a))
-}
-
-export function chop(it, cb, ctx) {
-  is.n(cb) && (cb = (n => (x, i) => 0 === i % n)(cb))
-  for (var tmp, re = [], i = 0; i < it.length; i++) {
-    cb.call(ctx, it[ i ], i) && re.push(tmp = [])
+export function chop(it, n) {
+  const re = []
+  const cb = n === +n ? (x, i) => 0 === i % n : n
+  for (let tmp, i = 0; i < it.length; i++) {
+    cb(it[ i ], i) && re.push(tmp = [])
     tmp.push(it[ i ])
   }
   return re
 }
 
-export function where(it, cb, ctx) {
-  cb = predict(cb)
-  for (var re = [], i = it.length; i--;)
-    cb.call(ctx, it[ i ], i, it) && re.unshift(it[ i ])
-  return re
+export function rotor(n) {
+  let h; let c = 0; let i = 0; let r = new A(n)
+  return use(r, {
+    get i() { return i },
+    get head() { return h },
+    get cursor() { return c },
+    add(x) { return echo(i, h = r[ c = i++ % n ] = x) },
+  })
 }
 
-export function remove(it, x, ctx) {
-  for (var j = 0, i = 0, re = [], cb = predict(x); i < it.length; i++) {
-    cb.call(ctx, it[ i ], i, it)
-      ? re.push(it[ i ])
-      : it[ j++ ] = it[ i ]
+export function where(it, iter, ctx) {
+  return Is.s(it)
+    ? A.from(it.matchAll(iter), ctx ??= x => x?.groups ?? x)
+    : it.filter(predicate(iter), ctx)
+}
+
+///////////////////////////////////////////////////////////
+
+export function Rx(s, ...a) {
+  let fl = ''; let pttr = s?.raw ? S.raw(s, ...a) : s
+  pttr = pttr.replace(/( +)?\n+( +)?/g, '').trim()
+  pttr = pttr.replace(/\/([gimdsuy]+)\/?$/, (_, f) => echo('', fl += f)).trim()
+  return new RegExp(pttr, fl)
+}
+
+export function Log(s, ...a) {
+  s?.raw
+    ? console.log(S.raw(s, ...a))
+    : console.log(s, ...a)
+}
+
+export function Sym(s, ...a) {
+  return typeof k == 'symbol'
+    ? Symbol.keyFor(s)
+    : Symbol(s?.raw ? S.raw(s, ...a) : s)
+}
+
+Sym.ok    = Sym`✅`
+Sym.no    = Sym`❎`
+Sym.id    = Sym`🆔`
+Sym.end   = Sym`🏁`
+Sym.once  = Sym`🔂`
+Sym.stop  = Sym`⛔️`
+Sym.start = Sym`🎬`
+Sym.help  = Sym`🆘`
+Sym.flag  = Sym`🚩`
+
+alias(console, 'group', 'g')
+alias(console, 'groupEnd', 'end')
+alias(console, 'groupCollapsed', 'gc')
+
+use(Log, console)
+use(Log, {
+  each(a) {
+    Log.gc('Each')
+    for (const x of a)
+      Log(x)
+    Log.end()
   }
-  it.length = j
-  return re
-}
+})
 
-function predict(x) {
-  return is.f(x)
-    ? x
-    : (kk => o => kk.every(k => o[ k ] === x[ k ]))(O.keys(x))
-}
+///////////////////////////////////////////////////////////
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-use(S, { az })
-use(A, { fill, range, invoke, chop, where, remove })
-
-use(A.prototype, {
-  get uniqe() {
-    return A.from(new Set(this))
+use(O, {
+  from: fromEntries,
+  get o() {
+    return O.create(null)
   },
 })
 
 use(S.prototype, {
-  get log() {
-    return console.log(this.valueOf())
-  },
-
-  rx(fl = '') {
-    return new RegExp(this.replace(/( +)?\n+( +)?/g, ''), fl)
-  },
-
-  where(rx, cb = x => x) { return A.from(this.matchAll(rx), x => cb(x.groups ?? x)) },
-
-  justify(n) {
-    return this.replace(`
-      (?![^\n]{1,${ n }}$)
-      ([^\n]{1,${ n }})\s
-    `.rx.g, '$1\n')
-  },
-
-
-  pad(n, x = ' ') {
-    let fl = 0
-    let s = S(this)
-    while (n > s.length) {
-      fl ^= 1
-      s = fl
-        ? s + x
-        : x + s
-    }
-    return s
-  },
+  get up()    { return this.toUpperCase() },
+  get low()   { return this.toLowerCase() },
+  get log()   { return Log('%s', this)    },
+  get char()  { return this.charCodeAt()  },
+  get point() { return this.codePointAt() },
 })
-
-use(RegExp.prototype, {
-  clone(fl) {
-    return new RegExp(this.source, fl ?? this.flags)
-  },
-})
-
-alias(A.prototype,  'includes', 'has')
-alias(A.prototype,  'forEach', 'each')
-alias(Map.prototype, 'forEach', 'each')
-alias(Set.prototype, 'forEach', 'each')
-alias(A.prototype, 'forEach', 'each')
-alias(A.prototype, 'includes', 'has')
-alias(S.prototype, 'includes', 'has')
-alias(S.prototype, 'endsWith', 'ends')
-alias(S.prototype, 'startsWith', 'starts')
-alias(S.prototype, 'charCodeAt', 'code')
-alias(S.prototype, 'codePointAt', 'point')
-alias(S, 'fromCharCode', 'code')
-alias(S, 'fromCodePoint', 'point')
-aliasGet(S.prototype, 'charCodeAt', 'ch')
-aliasGet(S.prototype, 'codePointAt', 'pt')
-aliasGet(S.prototype, 'toUpperCase', 'up')
-aliasGet(S.prototype, 'toLowerCase', 'low')
-aliasGet(S.prototype, 'at', 'head', 0)
-aliasGet(S.prototype, 'at', 'tail', -1)
-aliasGet(A.prototype, 'at', 'head', 0)
-aliasGet(A.prototype, 'at', 'tail', -1)
 

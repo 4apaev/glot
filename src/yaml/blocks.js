@@ -1,4 +1,12 @@
-import { O, T, is, set } from '../util.js'
+import {
+  O,
+  S,
+  T,
+  Is,
+  raise,
+  each,
+  use,
+} from '../util.js'
 
 const links = O.freeze({
   Set: '=',
@@ -7,10 +15,9 @@ const links = O.freeze({
   Object: ':',
 })
 
-Yaml.stringify = stringify
 export default function Yaml(str, ...argv) {
-  if (is.a(str.raw))
-    str = String.raw(str, ...argv)
+  if (str?.raw)
+    str = S.raw(str, ...argv)
 
   let prev
   let tree = Block(0, 'tree')
@@ -22,7 +29,8 @@ export default function Yaml(str, ...argv) {
     let tag = line.trim()
     if (tag.length === 0)
       continue
-    is.i.assert(i /= 2, `Bad Indent at line: [${ i }, ${ line }]`)
+
+    Number.isInteger(i /= 2) || raise(`Bad Indent at line: [${ i }, ${ line }]`)
 
     if (i > curr.i) {
       prev = curr
@@ -34,15 +42,17 @@ export default function Yaml(str, ...argv) {
     }
   }
 
-  return set(tree, 'blocks', blocks.map(({ i, tag, parent = Block(-1) }) => ({
-    i,
-    tag,
-    parent: `${ parent.i }:${ parent.tag }`,
-  })))
+  return use(tree, {
+    blocks: blocks.map(({ i, tag, parent = Block(-1) }) => ({
+      i,
+      tag,
+      parent: `${ parent.i }:${ parent.tag }`,
+    }))
+  })
 }
 
 export function stringify(x, tab = '  ') {
-  if (is.n(tab))
+  if (Is.n(tab))
     tab = ' '.repeat(tab)
   return format(x, {
     tab,
@@ -52,12 +62,15 @@ export function stringify(x, tab = '  ') {
 }
 
 function Block(i, tag = '', parent) {
-  const b = [ tag.trim() ]
-  set(b, 'i', i)
-  set(b, 'tag', tag)
-  set(b, 'parent', parent)
-  parent?.push(b)
-  return b
+  const child = [ tag.trim() ]
+  use(child, {
+    get i() { return i },
+    get tag() { return tag },
+    get parent() { return parent },
+  })
+
+  parent?.push(child)
+  return child
 }
 
 function format(x, o, path) {
@@ -71,12 +84,15 @@ function format(x, o, path) {
     o.prev = next
 
     if (next == 'Array' || next == 'Set') {
-      for (const v of x) 
+      for (const v of x)
         format(v, o, path.concat(''))
     }
     else {
-      for (const [ k, v ] of x?.entries?.() ?? O.entries(x))
-        format(v, o, path.concat(k))
+
+      each(x, (k, v) => format(v, o, path.concat(k)))
+
+      // for (const [ k, v ] of entries(x))
+      //   format(v, o, path.concat(k))
     }
   }
   else {
@@ -86,12 +102,17 @@ function format(x, o, path) {
 }
 
 function resolve(x, path, opt) {
-  let n    = path.length
-  let val  = opt.tab.repeat(n)
-  let key  = path[ n - 1 ] ?? ''
+  let n = path.length
+  let val = opt.tab.repeat(n)
+  let key = path[ n - 1 ] ?? ''
   let link = links[ opt.prev ] ?? '~'
-  opt.res.push(val + key + link + ' ' + x ?? '')
+
+  x ??= ''
+  link += ' '
+
+  opt.res.push(val + key + link  + x)
 }
 
 
 
+Yaml.stringify = stringify

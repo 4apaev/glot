@@ -1,11 +1,12 @@
 import Yaml from './blocks.js'
-import { S, is, use, tmpl } from '../util.js'
+import { S, Is, Log, use } from '../util.js'
 
 export default function format(s, ...a) {
-  if (is.a(s?.raw))
-    return tmpl(s, a, tost).join('')
+  if (s?.raw)
+    return S.raw(s, ...a)
 
   let re = s.replace(/\{(\d)\}/g, (_, k) => tost(a[ +k ] ?? k))
+
   if (re !== s)
     return re
 
@@ -16,7 +17,7 @@ export default function format(s, ...a) {
 }
 
 function tost(x) {
-  return is.o(x)
+  return Is.o(x)
     ? Yaml.stringify(x)
     : S(x)
 }
